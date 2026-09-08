@@ -34,6 +34,7 @@ jobs:
           grep -q 'styles.css' index.html
           grep -q 'app.js' index.html
           node --check app.js
+          node tests/site.test.mjs
           echo 'Static site validation passed'
 
       - name: Configure Pages
