@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-label="Детский акварельный рисунок: ребёнок рисует солнце">
+<defs>
+  <filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".015" numOctaves="3" seed="7"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .10"/></feComponentTransfer></filter>
+  <filter id="w"><feTurbulence type="fractalNoise" baseFrequency=".025" numOctaves="2" seed="11" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="6"/><feGaussianBlur stdDeviation=".35"/></filter>
+</defs>
+<rect width="900" height="620" fill="#fffaf4"/><rect width="900" height="620" fill="#b9936a" filter="url(#paper)"/>
+<g filter="url(#w)" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M90 155c70-42 130-23 158 8-13 34-102 40-158-8z" fill="#a8d5ff" opacity=".72"/>
+  <path d="M670 135c60-34 120-16 142 13-20 25-91 30-142-13z" fill="#b9defa" opacity=".7"/>
+  <circle cx="705" cy="155" r="74" fill="#ffd84e" opacity=".82" stroke="#e7a826" stroke-width="6"/>
+  <path d="M705 43v-40M705 307v-40M593 155h-42M859 155h-42M626 76l-31-31M785 234l31 31M784 76l31-31M626 234l-31 31" stroke="#f2b92d" stroke-width="11"/>
+  <circle cx="680" cy="143" r="6" fill="#5c493b"/><circle cx="730" cy="143" r="6" fill="#5c493b"/>
+  <path d="M677 176c18 21 42 21 58 0" fill="none" stroke="#6f5136" stroke-width="6"/>
+  <path d="M510 585c-7-90 19-196 86-262 28-28 68-50 113-54" fill="none" stroke="#62aa68" stroke-width="9" opacity=".65"/>
+  <path d="M520 555c42-41 111-62 185-52M531 522c51-38 122-49 185-34" fill="none" stroke="#7dc37c" stroke-width="14" opacity=".55"/>
+  <path d="M422 268c31-61 93-92 151-71 38 14 68 51 66 95-34-10-70-5-99 17-45 32-83 25-118-41z" fill="#7a4a2b" opacity=".88"/>
+  <circle cx="524" cy="308" r="75" fill="#f1bf9f"/>
+  <path d="M458 306c10-76 100-112 152-50-24 8-39 20-47 39-29-21-69-16-105 11z" fill="#6f4329"/>
+  <path d="M445 303c-66 40-89 105-75 179l92 89h137l-7-133-58-48-22-65z" fill="#ef7890" opacity=".9"/>
+  <path d="M564 353c52-52 94-85 122-109" fill="none" stroke="#ef7890" stroke-width="34"/>
+  <path d="M677 250l29-35" stroke="#5a4334" stroke-width="16"/>
+  <path d="M705 214l-1-33" stroke="#252525" stroke-width="8"/>
+  <path d="M362 520c-32 8-63 29-86 60M616 556c32-16 70-17 110 5" fill="none" stroke="#5cab62" stroke-width="10" opacity=".7"/>
+  <path d="M178 575l23-60 21 60M266 580l18-49 18 49M760 573l20-57 22 57" fill="none" stroke="#73bb72" stroke-width="9"/>
+  <path d="M738 532l36-44 35 44v48h-71z" fill="#ffd75b" stroke="#d69258" stroke-width="5"/><path d="M735 528l39-48 41 48" fill="#f27f73"/>
+  <circle cx="810" cy="552" r="28" fill="#e7a95f"/><path d="M788 535l-7-20 18 10M831 535l7-20-18 10M795 560c10 7 20 7 30 0" fill="none" stroke="#6b4d38" stroke-width="4"/>
+</g>
+</svg>
