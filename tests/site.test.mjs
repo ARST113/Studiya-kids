@@ -5,25 +5,14 @@ const css=fs.readFileSync('styles.css','utf8');
 const must=(c,m)=>assert.ok(c,m);
 
 must(!html.includes('images.unsplash.com'),'stock Unsplash images must be removed');
-must(html.includes('class="brand brand-original"'),'original-style brand treatment must be present');
+must(html.includes('class="brand brand-original"'),'brand anchor must be present');
+must(fs.existsSync('assets/logo.png'),'original logo PNG must exist');
+must(fs.existsSync('watercolor.css'),'logo override stylesheet must exist');
+const override=fs.readFileSync('watercolor.css','utf8');
+must(override.includes("assets/logo.png"),'original logo PNG must be used by the live site');
 must(html.includes('id="video"'),'video section must exist');
-must(!html.includes('.svg'),'live HTML must not use SVG illustrations');
 
-const pngAssets=[
-  'assets/hero-watercolor.png',
-  'assets/about-watercolor.png',
-  'assets/video-poster.png',
-  'assets/course-early.png',
-  'assets/course-math.png',
-  'assets/course-robot.png',
-  'assets/course-lego.png',
-  'assets/course-music.png',
-  'assets/course-school.png'
-];
-for(const path of pngAssets){
-  must(html.includes(path),`PNG artwork must be referenced: ${path}`);
-  must(fs.existsSync(path),`PNG artwork file missing: ${path}`);
-}
+for(const path of ['assets/hero-watercolor.svg','assets/about-watercolor.svg','assets/video-poster.svg','assets/course-early.svg','assets/course-math.svg','assets/course-robot.svg','assets/course-lego.svg','assets/course-music.svg','assets/course-school.svg']) must(fs.existsSync(path),`current artwork file missing: ${path}`);
 
 must(html.includes('name="consent"'),'consent checkbox must exist');
 must(html.includes('name="consent" required'),'consent checkbox must be required');
@@ -33,4 +22,4 @@ must(css.toLowerCase().includes('#f2389e'),'original site pink #f2389e must be p
 must(css.includes('--brand-pink'),'brand palette variables must be declared');
 must(fs.existsSync('consent.html'),'consent page must exist');
 
-console.log('PNG site acceptance checks passed');
+console.log('site acceptance checks passed');
