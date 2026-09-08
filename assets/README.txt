@@ -1,1 +1,0 @@
-Watercolor assets for Studiya Kids landing page.
