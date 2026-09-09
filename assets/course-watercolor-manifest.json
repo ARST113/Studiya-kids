@@ -1,0 +1,44 @@
+{
+  "early": {
+    "path": "assets/course-early-watercolor.png",
+    "sha256": "88a20486a8b2815decbbce2e222190105d4fa13d0ca4642a352aca4790ec68a6",
+    "bytes": 2126899,
+    "width": 1774,
+    "height": 887
+  },
+  "math": {
+    "path": "assets/course-math-watercolor.png",
+    "sha256": "86de8b4d9b420505069575129806314a945e7535cf8777b73e049739dd2631c5",
+    "bytes": 2087960,
+    "width": 1774,
+    "height": 887
+  },
+  "robot": {
+    "path": "assets/course-robot-watercolor.png",
+    "sha256": "a9821124a75cfaf0856beb205f8da96b36596dbb5f4b036fe40ce516d5ebb2da",
+    "bytes": 2009098,
+    "width": 1774,
+    "height": 887
+  },
+  "lego": {
+    "path": "assets/course-lego-watercolor.png",
+    "sha256": "fe00e37a2e1cb2847ff0710fed50acf951d5b274c84ab539f7e49d2afdfc4bd3",
+    "bytes": 2070931,
+    "width": 1774,
+    "height": 887
+  },
+  "music": {
+    "path": "assets/course-music-watercolor.png",
+    "sha256": "82dee963b6d9647a9bf0bb725ca9aa1895fb8036b6619a814d00201c7e845955",
+    "bytes": 1926742,
+    "width": 1774,
+    "height": 887
+  },
+  "school": {
+    "path": "assets/course-school-watercolor.png",
+    "sha256": "df26e6e8877acadefe9fb19b44024e22c55d7dc5dd31990d15d69e92dc45df6d",
+    "bytes": 1993147,
+    "width": 1774,
+    "height": 887
+  }
+}
