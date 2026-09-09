@@ -1,0 +1,92 @@
+name: Build VTracer logo preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vtracer-preview.yml'
+      - 'tools/logo-source-320.b64'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vtracer-logo-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install VTracer and Pillow
+        run: python -m pip install --disable-pip-version-check vtracer==1.0.0a4 pillow
+
+      - name: Prepare clean transparent logo source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p preview
+          tr -d '\r\n\t ' < tools/logo-source-320.b64 | base64 -d > /tmp/logo-raw.png
+          python - <<'PY'
+          from PIL import Image
+          im=Image.open('/tmp/logo-raw.png').convert('RGBA')
+          # Crop away the colored arcs from the circular background while keeping all logo marks.
+          im=im.crop((8,28,313,147))
+          px=im.load()
+          for y in range(im.height):
+              for x in range(im.width):
+                  r,g,b,a=px[x,y]
+                  # Remove the white/off-white background and its antialias fringe.
+                  d=max(abs(255-r),abs(255-g),abs(255-b))
+                  if d < 34:
+                      px[x,y]=(255,255,255,0)
+          im.save('preview/logo-source-clean.png')
+          print('prepared', im.size)
+          PY
+
+      - name: Vectorize with VTracer fixed palette
+        shell: bash
+        run: |
+          set -euo pipefail
+          vtracer preview/logo-source-clean.png preview/logo-vtracer.svg \
+            --preset poster \
+            --hierarchical cutout \
+            --mode spline \
+            --filter-speckle 1 \
+            --simplify 0.8 \
+            --path-precision 2 \
+            --palette '#3d301b,#a9eb3d,#ce3978,#5bdaf3,#fae42f' \
+            --optimize 2
+          test -s preview/logo-vtracer.svg
+          grep -q '<svg' preview/logo-vtracer.svg
+          ! grep -q '<image' preview/logo-vtracer.svg
+          echo "paths=$(grep -o '<path' preview/logo-vtracer.svg | wc -l)"
+
+      - name: Render SVG preview for visual verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check cairosvg
+          python - <<'PY'
+          import cairosvg
+          cairosvg.svg2png(url='preview/logo-vtracer.svg',write_to='preview/logo-vtracer-preview.png',output_width=1220,output_height=476)
+          PY
+
+      - name: Commit preview only, do not change live site
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add preview/logo-source-clean.png preview/logo-vtracer.svg preview/logo-vtracer-preview.png
+          if ! git diff --cached --quiet; then
+            git commit -m 'Build VTracer logo preview for inspection'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
