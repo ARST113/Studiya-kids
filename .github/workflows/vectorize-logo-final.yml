@@ -1,0 +1,145 @@
+name: Vectorize Studiya Kids logo and publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vectorize-logo-final.yml'
+      - 'tools/logo-source-320.b64'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: vectorize-logo-final
+  cancel-in-progress: true
+
+jobs:
+  vectorize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout site
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch ImageTracerJS
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/jankovicsandras/imagetracerjs.git /tmp/imagetracerjs
+          test -s /tmp/imagetracerjs/nodecli/nodecli.js
+
+      - name: Rebuild valid PNG source
+        shell: bash
+        run: |
+          set -euo pipefail
+          tr -d '\r\n\t ' < tools/logo-source-320.b64 | base64 -d > /tmp/logo-source.png
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('/tmp/logo-source.png').read_bytes()
+          assert b[:8] == b'\x89PNG\r\n\x1a\n'
+          assert len(b) > 9000, len(b)
+          print('PNG bytes:', len(b))
+          PY
+          file /tmp/logo-source.png
+
+      - name: Trace PNG to real SVG
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v convert >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+          fi
+          convert /tmp/logo-source.png -alpha on -type TrueColorMatte PNG32:/tmp/logo-rgba.png
+          node /tmp/imagetracerjs/nodecli/nodecli.js \
+            /tmp/logo-rgba.png \
+            -outfilename "$GITHUB_WORKSPACE/assets/logo.svg" \
+            numberofcolors 32 \
+            pathomit 1 \
+            ltres 0.25 \
+            qtres 0.25 \
+            colorquantcycles 4 \
+            strokewidth 0 \
+            roundcoords 2 \
+            scale 1 \
+            viewbox true \
+            desc false
+          test -s assets/logo.svg
+          grep -q '<svg' assets/logo.svg
+          ! grep -q '<image' assets/logo.svg
+          count=$(grep -o '<path' assets/logo.svg | wc -l)
+          echo "SVG path count: $count"
+          test "$count" -gt 10
+
+      - name: Put vector logo into the live header
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('index.html')
+          s=p.read_text()
+          pattern=r'(<a class="brand brand-original"[^>]*>).*?(</a>)'
+          replacement=r'\1<img class="brand-logo" src="assets/logo.svg" alt="Студия Kids">\2'
+          s,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          assert n==1, n
+          p.write_text(s)
+
+          p=Path('styles.css')
+          s=p.read_text()
+          marker='/* vectorized original logo */'
+          block='''\n/* vectorized original logo */\n.brand-original{display:flex!important;align-items:center;width:auto!important;height:auto!important;flex:0 0 auto!important;background:none!important}\n.brand-original .brand-logo{display:block;width:auto;height:66px;max-width:220px;object-fit:contain}\n.brand-original .brand-sun,.brand-original .brand-copy{display:none!important}\n@media(max-width:620px){.brand-original .brand-logo{height:54px;max-width:175px}}\n'''
+          if marker in s:
+              s=s[:s.index(marker)].rstrip()+block
+          else:
+              s=s.rstrip()+block
+          p.write_text(s)
+
+          Path('tests/site.test.mjs').write_text('''import fs from "node:fs";\nimport assert from "node:assert/strict";\nconst html=fs.readFileSync("index.html","utf8");\nconst css=fs.readFileSync("styles.css","utf8");\nconst svg=fs.readFileSync("assets/logo.svg","utf8");\nconst must=(c,m)=>assert.ok(c,m);\nmust(html.includes('class="brand-logo"'),"vector logo image must be in the header");\nmust(html.includes('src="assets/logo.svg"'),"header must reference assets/logo.svg");\nmust(!html.includes('class="brand-sun"'),"old CSS-drawn logo markup must be removed");\nmust(css.includes('vectorized original logo'),"vector logo CSS must exist");\nmust(svg.includes('<svg'),"logo.svg must be valid SVG");\nmust(!svg.includes('<image'),"logo.svg must contain vectors, not embedded raster");\nmust((svg.match(/<path/g)||[]).length>10,"logo.svg must have traced paths");\nmust(html.includes('id="video"'),"video section must remain");\nmust(html.includes('name="consent" required'),"consent checkbox must remain required");\nmust(html.includes('href="consent.html"'),"consent page link must remain");\nmust(css.toLowerCase().includes('#f2389e'),"brand palette must remain");\nconsole.log("vector logo acceptance checks passed");\n''')
+          PY
+          node tests/site.test.mjs
+
+      - name: Commit generated logo and header change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/logo.svg index.html styles.css tests/site.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Use traced original Studiya Kids logo SVG'
+            git push origin HEAD:main
+          fi
+
+      - name: Final verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node tests/site.test.mjs
+          test -s assets/logo.svg
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
