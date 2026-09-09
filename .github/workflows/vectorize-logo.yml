@@ -43,8 +43,14 @@ jobs:
           set -euo pipefail
           test -s assets/logo.png
           file assets/logo.png
+          if ! command -v convert >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+          fi
+          convert assets/logo.png -alpha on -type TrueColorMatte /tmp/logo-rgba.png
+          file /tmp/logo-rgba.png
           node /tmp/imagetracerjs/nodecli/nodecli.js \
-            "$GITHUB_WORKSPACE/assets/logo.png" \
+            /tmp/logo-rgba.png \
             -outfilename "$GITHUB_WORKSPACE/assets/logo.svg" \
             numberofcolors 32 \
             pathomit 1 \
