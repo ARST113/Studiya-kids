@@ -1,0 +1,70 @@
+name: Fix and verify responsive layout
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/apply-responsive-fix.yml']
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: responsive-layout-publish
+  cancel-in-progress: false
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Apply tested CSS and navigation without touching PNGs
+        shell: python
+        run: |
+          from pathlib import Path
+          css=Path('styles.css')
+          if 'Responsive layout: content can shrink' not in css.read_text():
+              with css.open('a') as f: f.write('\n'+Path('tools/responsive-fix.css').read_text())
+          old="const toggle=document.getElementById('mobileToggle'),nav=document.getElementById('navLinks');toggle.addEventListener('click',()=>nav.classList.toggle('open'));nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));"
+          js=Path('app.js'); code=js.read_text()
+          assert code.count(old)==1, 'Navigation changed concurrently; refusing an unsafe replacement'
+          js.write_text(code.replace(old,Path('tools/responsive-nav.js').read_text()))
+      - name: Validate static site
+        run: |
+          node --check app.js
+          node tests/site.test.mjs
+      - name: Install browser testing outside the website
+        run: |
+          npm install --prefix /tmp/studiya-browser-checks playwright
+          cd /tmp/studiya-browser-checks
+          npx playwright install --with-deps chromium
+      - name: Test 276px through desktop widths and verify all original PNGs
+        env:
+          NODE_PATH: /tmp/studiya-browser-checks/node_modules
+        run: node tests/responsive.test.cjs
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-and-watercolor-evidence
+          path: /tmp/studiya-screenshots/
+          retention-days: 7
+      - name: Commit verified responsive changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add styles.css app.js
+          git commit -m 'Fix 276px layout, responsive menu and overlapping mobile CTA'
+          git push origin HEAD:main
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
