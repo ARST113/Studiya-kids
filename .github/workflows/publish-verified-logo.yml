@@ -1,0 +1,110 @@
+name: Publish verified VTracer logo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-verified-logo.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify approved preview before promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          m={}
+          for line in Path('preview/logo-quality.txt').read_text().splitlines():
+              k,v=line.split('=',1); m[k]=float(v)
+          assert m['mask_iou'] > 0.90, m
+          assert m['mae'] < 20, m
+          assert m['corner_alpha_max'] == 0, m
+          assert 0.30 < m['vector_foreground'] < 0.55, m
+          svg=Path('preview/logo-vtracer.svg').read_text()
+          assert '<svg' in svg and '<image' not in svg
+          print('approved visual metrics', m)
+          PY
+
+      - name: Install cache-busted verified logo in header and footer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp preview/logo-vtracer.svg assets/logo-vtracer.svg
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old='assets/logo.svg'
+          new='assets/logo-vtracer.svg'
+          count=s.count(old)
+          assert count >= 2, f'expected header and footer references, found {count}'
+          s=s.replace(old,new)
+          p.write_text(s)
+
+          p=Path('tests/site.test.mjs')
+          s=p.read_text().replace('assets/logo.svg','assets/logo-vtracer.svg').replace('logo.svg','logo-vtracer.svg')
+          p.write_text(s)
+          PY
+          test -s assets/logo-vtracer.svg
+          ! grep -q '<image' assets/logo-vtracer.svg
+          test "$(grep -o 'src=\"assets/logo-vtracer.svg\"' index.html | wc -l)" -ge 2
+          node --check app.js
+          node tests/site.test.mjs
+
+      - name: Commit permanent site change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/logo-vtracer.svg index.html tests/site.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Use visually verified VTracer logo on live site'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Verify exact files being published
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'src="assets/logo-vtracer.svg"' index.html
+          ! grep -q 'src="assets/logo.svg"' index.html
+          test -s assets/logo-vtracer.svg
+          ! grep -q '<image' assets/logo-vtracer.svg
+          node tests/site.test.mjs
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
