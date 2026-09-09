@@ -1,0 +1,102 @@
+name: Publish original course PNGs
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-original-course-png.yml']
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: original-course-png-publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Retrieve exact approved PNG bytes and verify before replacing assets
+        shell: python
+        run: |
+          import hashlib, json, pathlib, struct, urllib.request
+          sources = {
+            'early': ('88a20486a8b2815decbbce2e222190105d4fa13d0ca4642a352aca4790ec68a6', 'https://oaisdmntprsoutheastus3.blob.core.windows.net/files/00000000-be28-820c-b7e0-f0db34721f4b/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T08%3A40%3A00Z&ske=2026-09-10T08%3A40%3A00Z&sks=b&skv=2026-02-06&sig=lpD2SzU7vK0oRNUjAvfdqhP16w01BBdXkL%2BcjGNw5dw%3D'),
+            'math': ('86de8b4d9b420505069575129806314a945e7535cf8777b73e049739dd2631c5', 'https://oaisdmntpritalynorth.blob.core.windows.net/files/00000000-5298-8246-b4ae-82a28d834b69/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T09%3A38%3A43Z&ske=2026-09-10T09%3A38%3A43Z&sks=b&skv=2026-02-06&sig=7P2s0S149KAIKY5XRvJ1rfjDU6JapzvDBMlLN8y2orc%3D'),
+            'robot': ('a9821124a75cfaf0856beb205f8da96b36596dbb5f4b036fe40ce516d5ebb2da', 'https://oaisdmntprnortheu.blob.core.windows.net/files/00000000-cc90-81f4-8150-c3c7623ba339/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T07%3A44%3A28Z&ske=2026-09-10T07%3A44%3A28Z&sks=b&skv=2026-02-06&sig=J/nkicMUdojkhkVzcVrssqIVS5x/7S3sUoErGAt21H8%3D'),
+            'lego': ('fe00e37a2e1cb2847ff0710fed50acf951d5b274c84ab539f7e49d2afdfc4bd3', 'https://oaisdmntprukwest.blob.core.windows.net/files/00000000-9518-8243-b99a-99f246deda9b/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T09%3A38%3A50Z&ske=2026-09-10T09%3A38%3A50Z&sks=b&skv=2026-02-06&sig=vdWquAxnEsxkTQxs11xwEZTno6hcDt7VAd0mMVEARXg%3D'),
+            'music': ('82dee963b6d9647a9bf0bb725ca9aa1895fb8036b6619a814d00201c7e845955', 'https://oaisdmntpreastus.blob.core.windows.net/files/00000000-9528-81f9-a97b-0d3dd761b4fa/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T07%3A44%3A30Z&ske=2026-09-10T07%3A44%3A30Z&sks=b&skv=2026-02-06&sig=tJKTCP/Qn/Em0bZOL3TF7VonUuVQal26dDIhEci2L34%3D'),
+            'school': ('df26e6e8877acadefe9fb19b44024e22c55d7dc5dd31990d15d69e92dc45df6d', 'https://oaisdmntprnortheu.blob.core.windows.net/files/00000000-fb40-81f4-ac43-850129dca10f/raw?se=2026-09-09T10%3A31%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=01a085af-9a53-79a3-91b5-6eaafa5ec30b&skoid=a4604a88-85e4-4562-b6ab-a5622268de80&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-09T07%3A44%3A29Z&ske=2026-09-10T07%3A44%3A29Z&sks=b&skv=2026-02-06&sig=bm1nSN2EEyIyDquHn29RrJa5Q43NYV6pweiiBiovbxI%3D')
+          }
+          pending = {}
+          manifest = {}
+          for key, (expected, url) in sources.items():
+              with urllib.request.urlopen(url, timeout=60) as response:
+                  data = response.read()
+              assert data[:8] == b'\x89PNG\r\n\x1a\n', key + ': not a PNG'
+              assert hashlib.sha256(data).hexdigest() == expected, key + ': original bytes differ'
+              width, height = struct.unpack('>II', data[16:24])
+              assert (width, height) == (1774, 887), key + ': incorrect dimensions'
+              path = 'assets/course-' + key + '-watercolor.png'
+              pending[path] = data
+              manifest[key] = {'path': path, 'sha256': expected, 'bytes': len(data), 'width': width, 'height': height}
+              print(key, len(data), expected, 'original PNG verified')
+          html_path = pathlib.Path('index.html')
+          html = html_path.read_text()
+          for key in sources:
+              old = 'src="assets/course-' + key + '.svg"'
+              new = 'src="assets/course-' + key + '-watercolor.png" width="1774" height="887" decoding="async"'
+              assert html.count(old) == 1, key + ': unexpected current image reference'
+              html = html.replace(old, new)
+          for path, data in pending.items():
+              pathlib.Path(path).write_bytes(data)
+          html_path.write_text(html)
+          pathlib.Path('assets/course-watercolor-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          with pathlib.Path('styles.css').open('a') as css:
+              css.write('\n/* Preserve the complete approved watercolor PNG composition on all screens. */\n.course img[src$="-watercolor.png"]{width:100%;height:auto;aspect-ratio:2 / 1;object-fit:contain;display:block}\n')
+      - name: Validate site and original images
+        run: |
+          node --check app.js
+          node tests/site.test.mjs
+          python - <<'PY'
+          import hashlib, json, pathlib
+          m = json.loads(pathlib.Path('assets/course-watercolor-manifest.json').read_text())
+          assert len(m) == 6
+          for entry in m.values():
+              assert hashlib.sha256(pathlib.Path(entry['path']).read_bytes()).hexdigest() == entry['sha256']
+          print('All six uploaded files match the original SHA-256 checksums.')
+          PY
+      - name: Commit verified originals and course references
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/course-*-watercolor.png assets/course-watercolor-manifest.json index.html styles.css
+          git commit -m 'Use six approved original watercolor PNGs in course cards'
+          git push origin HEAD:main
+      - name: Save site for verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-with-original-png
+          path: |
+            index.html
+            consent.html
+            styles.css
+            app.js
+            watercolor.css
+            assets/
+            tests/
+          retention-days: 2
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
