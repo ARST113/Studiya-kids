@@ -1,0 +1,70 @@
+name: Promote verified VTracer logo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/promote-verified-logo.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote-verified-logo
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Enforce visual quality gate before touching live asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s preview/logo-vtracer.svg
+          test -s preview/logo-quality.txt
+          python - <<'PY'
+          from pathlib import Path
+          m={}
+          for line in Path('preview/logo-quality.txt').read_text().splitlines():
+              k,v=line.split('=',1); m[k]=float(v)
+          assert m['mask_iou'] > 0.68, m
+          assert m['mae'] < 55, m
+          assert m['corner_alpha_max'] < 16, m
+          assert 0.15 < m['vector_foreground'] < 0.75, m
+          svg=Path('preview/logo-vtracer.svg').read_text()
+          assert '<svg' in svg
+          assert '<image' not in svg
+          print('verified metrics:', m)
+          PY
+
+      - name: Promote verified SVG to live asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp preview/logo-vtracer.svg assets/logo.svg
+          test -s assets/logo.svg
+          grep -q '<svg' assets/logo.svg
+          ! grep -q '<image' assets/logo.svg
+          grep -q 'src="assets/logo.svg"' index.html
+          node --check app.js
+          node tests/site.test.mjs
+
+      - name: Commit promoted logo
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/logo.svg
+          if ! git diff --cached --quiet; then
+            git commit -m 'Promote verified VTracer Studiya Kids logo'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
