@@ -1,0 +1,5 @@
+source_foreground=0.4200
+vector_foreground=0.4385
+mask_iou=0.9539
+mae=12.85
+corner_alpha_max=0
