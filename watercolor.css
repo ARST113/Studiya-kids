@@ -1,1 +1,1 @@
-.brand-original{width:150px;height:68px;background:url('./assets/logo.png') center/contain no-repeat;display:block;flex:0 0 150px}.brand-original .brand-sun,.brand-original .brand-copy{display:none!important}@media(max-width:620px){.brand-original{width:126px;height:56px;flex-basis:126px}}
+.brand-original{width:150px;height:68px;background:url('./assets/logo.svg') center/contain no-repeat;display:block;flex:0 0 150px}.brand-original .brand-sun,.brand-original .brand-copy{display:none!important}@media(max-width:620px){.brand-original{width:126px;height:56px;flex-basis:126px}}
