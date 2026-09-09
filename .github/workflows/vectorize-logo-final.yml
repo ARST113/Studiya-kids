@@ -80,7 +80,7 @@ jobs:
           echo "SVG path count: $count"
           test "$count" -gt 10
 
-      - name: Put vector logo into the live header
+      - name: Put vector logo into live header and footer
         shell: bash
         run: |
           set -euo pipefail
@@ -92,25 +92,25 @@ jobs:
           s=p.read_text()
           pattern=r'(<a class="brand brand-original"[^>]*>).*?(</a>)'
           replacement=r'\1<img class="brand-logo" src="assets/logo.svg" alt="Студия Kids">\2'
-          s,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
-          assert n==1, n
+          s,n=re.subn(pattern,replacement,s,flags=re.S)
+          assert n >= 2, f'expected header and footer logos, replaced {n}'
           p.write_text(s)
 
           p=Path('styles.css')
           s=p.read_text()
           marker='/* vectorized original logo */'
-          block='''\n/* vectorized original logo */\n.brand-original{display:flex!important;align-items:center;width:auto!important;height:auto!important;flex:0 0 auto!important;background:none!important}\n.brand-original .brand-logo{display:block;width:auto;height:66px;max-width:220px;object-fit:contain}\n.brand-original .brand-sun,.brand-original .brand-copy{display:none!important}\n@media(max-width:620px){.brand-original .brand-logo{height:54px;max-width:175px}}\n'''
+          block='''\n/* vectorized original logo */\n.brand-original{display:flex!important;align-items:center;width:auto!important;height:auto!important;flex:0 0 auto!important;background:none!important}\n.brand-original .brand-logo{display:block;width:auto;height:66px;max-width:220px;object-fit:contain}\n.brand-original .brand-sun,.brand-original .brand-copy{display:none!important}\n.footer .brand-original .brand-logo{height:58px;max-width:200px}\n@media(max-width:620px){.brand-original .brand-logo{height:54px;max-width:175px}.footer .brand-original .brand-logo{height:50px;max-width:165px}}\n'''
           if marker in s:
               s=s[:s.index(marker)].rstrip()+block
           else:
               s=s.rstrip()+block
           p.write_text(s)
 
-          Path('tests/site.test.mjs').write_text('''import fs from "node:fs";\nimport assert from "node:assert/strict";\nconst html=fs.readFileSync("index.html","utf8");\nconst css=fs.readFileSync("styles.css","utf8");\nconst svg=fs.readFileSync("assets/logo.svg","utf8");\nconst must=(c,m)=>assert.ok(c,m);\nmust(html.includes('class="brand-logo"'),"vector logo image must be in the header");\nmust(html.includes('src="assets/logo.svg"'),"header must reference assets/logo.svg");\nmust(!html.includes('class="brand-sun"'),"old CSS-drawn logo markup must be removed");\nmust(css.includes('vectorized original logo'),"vector logo CSS must exist");\nmust(svg.includes('<svg'),"logo.svg must be valid SVG");\nmust(!svg.includes('<image'),"logo.svg must contain vectors, not embedded raster");\nmust((svg.match(/<path/g)||[]).length>10,"logo.svg must have traced paths");\nmust(html.includes('id="video"'),"video section must remain");\nmust(html.includes('name="consent" required'),"consent checkbox must remain required");\nmust(html.includes('href="consent.html"'),"consent page link must remain");\nmust(css.toLowerCase().includes('#f2389e'),"brand palette must remain");\nconsole.log("vector logo acceptance checks passed");\n''')
+          Path('tests/site.test.mjs').write_text('''import fs from "node:fs";\nimport assert from "node:assert/strict";\nconst html=fs.readFileSync("index.html","utf8");\nconst css=fs.readFileSync("styles.css","utf8");\nconst svg=fs.readFileSync("assets/logo.svg","utf8");\nconst must=(c,m)=>assert.ok(c,m);\nconst logos=(html.match(/class="brand-logo"/g)||[]).length;\nmust(logos>=2,"vector logo must be used in header and footer");\nmust((html.match(/src="assets\\/logo.svg"/g)||[]).length>=2,"header and footer must reference assets/logo.svg");\nmust(!html.includes('class="brand-sun"'),"old CSS-drawn logo markup must be removed");\nmust(!html.includes('class="brand-copy"'),"old CSS-drawn logo text must be removed");\nmust(css.includes('vectorized original logo'),"vector logo CSS must exist");\nmust(svg.includes('<svg'),"logo.svg must be valid SVG");\nmust(!svg.includes('<image'),"logo.svg must contain vectors, not embedded raster");\nmust((svg.match(/<path/g)||[]).length>10,"logo.svg must have traced paths");\nmust(html.includes('id="video"'),"video section must remain");\nmust(html.includes('name="consent" required'),"consent checkbox must remain required");\nmust(html.includes('href="consent.html"'),"consent page link must remain");\nmust(css.toLowerCase().includes('#f2389e'),"brand palette must remain");\nconsole.log("vector logo acceptance checks passed");\n''')
           PY
           node tests/site.test.mjs
 
-      - name: Commit generated logo and header change
+      - name: Commit generated logo and site changes
         shell: bash
         run: |
           set -euo pipefail
