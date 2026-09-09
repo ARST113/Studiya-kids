@@ -24,8 +24,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install VTracer and Pillow
-        run: python -m pip install --disable-pip-version-check vtracer==1.0.0a4 pillow
+      - name: Install VTracer and rendering tools
+        run: python -m pip install --disable-pip-version-check vtracer==1.0.0a4 pillow cairosvg
 
       - name: Prepare clean transparent logo source
         shell: bash
@@ -36,15 +36,14 @@ jobs:
           python - <<'PY'
           from PIL import Image
           im=Image.open('/tmp/logo-raw.png').convert('RGBA')
-          # Crop away the colored arcs from the circular background while keeping all logo marks.
+          # Remove the coloured arcs from the original circular background.
           im=im.crop((8,28,313,147))
           px=im.load()
           for y in range(im.height):
               for x in range(im.width):
                   r,g,b,a=px[x,y]
-                  # Remove the white/off-white background and its antialias fringe.
-                  d=max(abs(255-r),abs(255-g),abs(255-b))
-                  if d < 34:
+                  # Transparent background; retain the logo's coloured fills and dark outline.
+                  if max(abs(255-r),abs(255-g),abs(255-b)) < 34:
                       px[x,y]=(255,255,255,0)
           im.save('preview/logo-source-clean.png')
           print('prepared', im.size)
@@ -54,15 +53,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          vtracer preview/logo-source-clean.png preview/logo-vtracer.svg \
-            --preset poster \
-            --hierarchical cutout \
-            --mode spline \
-            --filter-speckle 1 \
-            --simplify 0.8 \
-            --path-precision 2 \
-            --palette '#3d301b,#a9eb3d,#ce3978,#5bdaf3,#fae42f' \
-            --optimize 2
+          python - <<'PY'
+          import vtracer
+          cfg=vtracer.Config.poster()
+          cfg.hierarchical='cutout'
+          cfg.mode='spline'
+          cfg.filter_speckle=1
+          cfg.simplify=0.8
+          cfg.path_precision=2
+          cfg.palette=['#3d301b','#a9eb3d','#ce3978','#5bdaf3','#fae42f']
+          cfg.optimize=2
+          cfg.convert_file('preview/logo-source-clean.png','preview/logo-vtracer.svg')
+          PY
           test -s preview/logo-vtracer.svg
           grep -q '<svg' preview/logo-vtracer.svg
           ! grep -q '<image' preview/logo-vtracer.svg
@@ -72,7 +74,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check cairosvg
           python - <<'PY'
           import cairosvg
           cairosvg.svg2png(url='preview/logo-vtracer.svg',write_to='preview/logo-vtracer-preview.png',output_width=1220,output_height=476)
