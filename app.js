@@ -1,6 +1,41 @@
 const courses={early:{title:'Раннее развитие',age:'1–3 года',desc:'Комплексные развивающие занятия вместе с мамой. Одно занятие объединено общей темой и состоит из коротких блоков: коммуникация, музыка, творчество, развитие речи и мышления, мелкая и общая моторика.\n\nВ основе — авторская методика Софьи Тимофеевой, дополненная элементами методик Железновых, Татьяны Ермолиной и М. Монтессори.'},math:{title:'Ментальная арифметика',age:'5–16 лет',desc:'Методика устного счёта, которая тренирует внимание, память и скорость обработки информации. Курс подходит дошкольникам как подготовка к дальнейшему обучению и школьникам как дополнительная интеллектуальная практика.\n\nЗанятия проводятся по авторской программе AMAKids.'},robot:{title:'Робототехника',age:'4–12 лет',desc:'Практические занятия на базе LEGO WeDo. Дети собирают модели, знакомятся с логикой механизмов и основами инженерного мышления, учатся доводить задачу от идеи до работающей конструкции.\n\nПродолжительность занятия — около 50–60 минут.'},lego:{title:'Lego Land',age:'3–4 года',desc:'Занятия с LEGO Duplo развивают мелкую моторику, пространственное мышление и способность находить нестандартные решения. В программу включены самостоятельные постройки, сюжетные задания, рабочие листы и музыкальные паузы.'},music:{title:'Музыка для малышей',age:'3–5 лет',desc:'Игровое музыкальное направление для дошкольников. Через ритм, движение и совместные упражнения ребёнок знакомится с музыкой и развивает слуховое внимание, координацию и творческую инициативу.'},school:{title:'Экспресс-подготовка к школе',age:'6–7 лет',desc:'Курс для будущих первоклассников, направленный на базовые учебные навыки, внимание, мышление и адаптацию к формату занятий.'}};
 const header=document.getElementById('header');addEventListener('scroll',()=>header.classList.toggle('scrolled',scrollY>12));
-const toggle=document.getElementById('mobileToggle'),nav=document.getElementById('navLinks');toggle.addEventListener('click',()=>nav.classList.toggle('open'));nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
+const toggle=document.getElementById('mobileToggle'),nav=document.getElementById('navLinks');
+const mobileNavQuery=matchMedia('(max-width:980px)');
+toggle.type='button';
+toggle.setAttribute('aria-controls','navLinks');
+toggle.setAttribute('aria-expanded','false');
+function setMenuOpen(open){
+  const expanded=Boolean(open&&mobileNavQuery.matches);
+  nav.classList.toggle('open',expanded);
+  toggle.setAttribute('aria-expanded',String(expanded));
+  toggle.setAttribute('aria-label',expanded?'Закрыть меню':'Открыть меню');
+  updateMobileCta();
+}
+toggle.addEventListener('click',()=>setMenuOpen(!nav.classList.contains('open')));
+nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>setMenuOpen(false)));
+document.addEventListener('pointerdown',e=>{if(!nav.contains(e.target)&&!toggle.contains(e.target))setMenuOpen(false)});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&nav.classList.contains('open')){setMenuOpen(false);toggle.focus()}});
+mobileNavQuery.addEventListener('change',()=>{if(!mobileNavQuery.matches)setMenuOpen(false)});
+// Avoid a floating duplicate over the hero action and the registration form.
+const floatingCta=document.querySelector('.mobile-cta');
+const ctaTargets=[document.querySelector('.hero'),document.getElementById('signup')].filter(Boolean);
+const ctaVisibility=new Map(ctaTargets.map(el=>[el,false]));
+function updateMobileCta(){
+  if(!floatingCta)return;
+  floatingCta.hidden=nav.classList.contains('open')||[...ctaVisibility.values()].some(Boolean);
+}
+const ctaObserver=new IntersectionObserver(entries=>{
+  entries.forEach(entry=>ctaVisibility.set(entry.target,entry.isIntersecting));
+  updateMobileCta();
+});
+ctaTargets.forEach(el=>{
+  const r=el.getBoundingClientRect();
+  ctaVisibility.set(el,r.bottom>0&&r.top<innerHeight);
+  ctaObserver.observe(el);
+});
+updateMobileCta();
+
 const modal=document.getElementById('modal'),mt=document.getElementById('modalTitle'),ma=document.getElementById('modalAge'),md=document.getElementById('modalDesc');document.querySelectorAll('.course').forEach(card=>{card.addEventListener('click',e=>{if(e.target.closest('a'))return;const c=courses[card.dataset.course];mt.textContent=c.title;ma.textContent=c.age;md.textContent=c.desc;modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.classList.add('lock')})});
 function closeModal(){modal.classList.remove('open');modal.setAttribute('aria-hidden','true');document.body.classList.remove('lock')}
 document.getElementById('modalClose').onclick=closeModal;document.getElementById('modalClose2').onclick=closeModal;document.getElementById('modalSignup').onclick=closeModal;modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
