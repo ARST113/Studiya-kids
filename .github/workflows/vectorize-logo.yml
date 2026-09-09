@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/vectorize-logo.yml'
-      - 'assets/logo.png'
+      - 'tools/logo-source.part*.b64'
   workflow_dispatch:
 
 permissions:
@@ -30,6 +30,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Rebuild exact logo source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tools/logo-source.part*.b64 | tr -d '\n\r' | base64 -d > /tmp/logo-source.png
+          test -s /tmp/logo-source.png
+          file /tmp/logo-source.png
+          python3 - <<'PY'
+          import struct,zlib
+          p='/tmp/logo-source.png'
+          b=open(p,'rb').read()
+          assert b[:8] == b'\x89PNG\r\n\x1a\n'
+          pos=8
+          seen_iend=False
+          while pos < len(b):
+              assert pos+12 <= len(b)
+              n=struct.unpack('>I',b[pos:pos+4])[0]
+              typ=b[pos+4:pos+8]
+              data=b[pos+8:pos+8+n]
+              crc=struct.unpack('>I',b[pos+8+n:pos+12+n])[0]
+              assert (zlib.crc32(typ+data)&0xffffffff)==crc, typ
+              pos += 12+n
+              if typ == b'IEND':
+                  seen_iend=True
+                  break
+          assert seen_iend and pos == len(b)
+          print('PNG integrity OK:',len(b),'bytes')
+          PY
+
       - name: Fetch ImageTracerJS from GitHub
         shell: bash
         run: |
@@ -37,20 +66,18 @@ jobs:
           git clone --depth 1 https://github.com/jankovicsandras/imagetracerjs.git /tmp/imagetracerjs
           test -s /tmp/imagetracerjs/nodecli/nodecli.js
 
-      - name: Vectorize original PNG logo
+      - name: Convert to truecolor and vectorize
         shell: bash
         run: |
           set -euo pipefail
-          test -s assets/logo.png
-          file assets/logo.png
           if ! command -v convert >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y imagemagick
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq imagemagick
           fi
-          convert assets/logo.png -alpha on -type TrueColorMatte /tmp/logo-rgba.png
-          file /tmp/logo-rgba.png
+          convert /tmp/logo-source.png -alpha off -type TrueColor /tmp/logo-rgb.png
+          file /tmp/logo-rgb.png
           node /tmp/imagetracerjs/nodecli/nodecli.js \
-            /tmp/logo-rgba.png \
+            /tmp/logo-rgb.png \
             -outfilename "$GITHUB_WORKSPACE/assets/logo.svg" \
             numberofcolors 32 \
             pathomit 1 \
@@ -65,7 +92,9 @@ jobs:
           test -s assets/logo.svg
           grep -q '<svg' assets/logo.svg
           ! grep -q '<image' assets/logo.svg
-          test "$(grep -o '<path' assets/logo.svg | wc -l)" -gt 10
+          paths=$(grep -o '<path' assets/logo.svg | wc -l)
+          test "$paths" -gt 10
+          echo "Vector paths: $paths"
 
       - name: Switch live header to vector logo
         shell: bash
@@ -106,6 +135,7 @@ jobs:
           node tests/site.test.mjs
           test -s assets/logo.svg
           ! grep -q '<image' assets/logo.svg
+          grep -q "assets/logo.svg" watercolor.css
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
