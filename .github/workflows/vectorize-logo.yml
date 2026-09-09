@@ -1,0 +1,114 @@
+name: Vectorize original logo and deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vectorize-logo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: vectorize-logo
+  cancel-in-progress: true
+
+jobs:
+  vectorize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout site
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch ImageTracerJS from GitHub
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/jankovicsandras/imagetracerjs.git /tmp/imagetracerjs
+          test -s /tmp/imagetracerjs/nodecli/nodecli.js
+
+      - name: Vectorize original PNG logo
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s assets/logo.png
+          node /tmp/imagetracerjs/nodecli/nodecli.js \
+            "$GITHUB_WORKSPACE/assets/logo.png" \
+            -outfilename "$GITHUB_WORKSPACE/assets/logo.svg" \
+            numberofcolors 32 \
+            pathomit 1 \
+            ltres 0.25 \
+            qtres 0.25 \
+            colorquantcycles 4 \
+            strokewidth 0 \
+            roundcoords 2 \
+            scale 1 \
+            viewbox true \
+            desc false
+          test -s assets/logo.svg
+          grep -q '<svg' assets/logo.svg
+          ! grep -q '<image' assets/logo.svg
+          test "$(grep -o '<path' assets/logo.svg | wc -l)" -gt 10
+
+      - name: Switch live header to vector logo
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('watercolor.css')
+          s=p.read_text()
+          s=s.replace("assets/logo.png", "assets/logo.svg")
+          p.write_text(s)
+          p=Path('tests/site.test.mjs')
+          s=p.read_text()
+          s=s.replace("assets/logo.png", "assets/logo.svg")
+          s=s.replace("original logo PNG", "vectorized original logo SVG")
+          p.write_text(s)
+          PY
+          grep -q "assets/logo.svg" watercolor.css
+          node tests/site.test.mjs
+
+      - name: Commit generated SVG
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/logo.svg watercolor.css tests/site.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Vectorize original Studiya Kids logo with ImageTracerJS'
+            git push origin HEAD:main
+          fi
+
+      - name: Validate final site
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node tests/site.test.mjs
+          test -s assets/logo.svg
+          ! grep -q '<image' assets/logo.svg
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
