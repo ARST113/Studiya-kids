@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/vectorize-logo.yml'
-      - 'tools/logo-source.part*.b64'
+      - 'tools/logo-source-320.b64'
   workflow_dispatch:
 
 permissions:
@@ -30,20 +30,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Rebuild exact logo source
+      - name: Rebuild logo source
         shell: bash
         run: |
           set -euo pipefail
-          cat tools/logo-source.part*.b64 | tr -d '\n\r' | base64 -d > /tmp/logo-source.png
+          tr -d '\n\r' < tools/logo-source-320.b64 | base64 -d > /tmp/logo-source.png
           test -s /tmp/logo-source.png
           file /tmp/logo-source.png
           python3 - <<'PY'
           import struct,zlib
-          p='/tmp/logo-source.png'
-          b=open(p,'rb').read()
+          b=open('/tmp/logo-source.png','rb').read()
           assert b[:8] == b'\x89PNG\r\n\x1a\n'
           pos=8
-          seen_iend=False
+          seen=False
           while pos < len(b):
               assert pos+12 <= len(b)
               n=struct.unpack('>I',b[pos:pos+4])[0]
@@ -53,10 +52,10 @@ jobs:
               assert (zlib.crc32(typ+data)&0xffffffff)==crc, typ
               pos += 12+n
               if typ == b'IEND':
-                  seen_iend=True
+                  seen=True
                   break
-          assert seen_iend and pos == len(b)
-          print('PNG integrity OK:',len(b),'bytes')
+          assert seen and pos == len(b)
+          print('PNG integrity OK:', len(b), 'bytes')
           PY
 
       - name: Fetch ImageTracerJS from GitHub
@@ -66,7 +65,7 @@ jobs:
           git clone --depth 1 https://github.com/jankovicsandras/imagetracerjs.git /tmp/imagetracerjs
           test -s /tmp/imagetracerjs/nodecli/nodecli.js
 
-      - name: Convert to truecolor and vectorize
+      - name: Vectorize logo
         shell: bash
         run: |
           set -euo pipefail
@@ -75,14 +74,13 @@ jobs:
             sudo apt-get install -y -qq imagemagick
           fi
           convert /tmp/logo-source.png -alpha off -type TrueColor /tmp/logo-rgb.png
-          file /tmp/logo-rgb.png
           node /tmp/imagetracerjs/nodecli/nodecli.js \
             /tmp/logo-rgb.png \
             -outfilename "$GITHUB_WORKSPACE/assets/logo.svg" \
-            numberofcolors 32 \
-            pathomit 1 \
-            ltres 0.25 \
-            qtres 0.25 \
+            numberofcolors 24 \
+            pathomit 2 \
+            ltres 0.35 \
+            qtres 0.35 \
             colorquantcycles 4 \
             strokewidth 0 \
             roundcoords 2 \
@@ -102,17 +100,14 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('watercolor.css')
-          s=p.read_text()
-          s=s.replace("assets/logo.png", "assets/logo.svg")
-          p.write_text(s)
-          p=Path('tests/site.test.mjs')
-          s=p.read_text()
-          s=s.replace("assets/logo.png", "assets/logo.svg")
-          s=s.replace("original logo PNG", "vectorized original logo SVG")
-          p.write_text(s)
+          for name in ['watercolor.css','tests/site.test.mjs']:
+              p=Path(name)
+              s=p.read_text()
+              s=s.replace('assets/logo.png','assets/logo.svg')
+              s=s.replace('original logo PNG','vectorized original logo SVG')
+              p.write_text(s)
           PY
-          grep -q "assets/logo.svg" watercolor.css
+          grep -q 'assets/logo.svg' watercolor.css
           node tests/site.test.mjs
 
       - name: Commit generated SVG
@@ -135,7 +130,7 @@ jobs:
           node tests/site.test.mjs
           test -s assets/logo.svg
           ! grep -q '<image' assets/logo.svg
-          grep -q "assets/logo.svg" watercolor.css
+          grep -q 'assets/logo.svg' watercolor.css
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
