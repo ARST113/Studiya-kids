@@ -119,6 +119,8 @@ jobs:
           git add assets/logo.svg index.html styles.css tests/site.test.mjs
           if ! git diff --cached --quiet; then
             git commit -m 'Use traced original Studiya Kids logo SVG'
+            git fetch origin main
+            git rebase origin/main
             git push origin HEAD:main
           fi
 
