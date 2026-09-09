@@ -36,13 +36,11 @@ jobs:
           python - <<'PY'
           from PIL import Image
           im=Image.open('/tmp/logo-raw.png').convert('RGBA')
-          # Remove the coloured arcs from the original circular background.
           im=im.crop((8,28,313,147))
           px=im.load()
           for y in range(im.height):
               for x in range(im.width):
                   r,g,b,a=px[x,y]
-                  # Transparent background; retain the logo's coloured fills and dark outline.
                   if max(abs(255-r),abs(255-g),abs(255-b)) < 34:
                       px[x,y]=(255,255,255,0)
           im.save('preview/logo-source-clean.png')
@@ -70,13 +68,48 @@ jobs:
           ! grep -q '<image' preview/logo-vtracer.svg
           echo "paths=$(grep -o '<path' preview/logo-vtracer.svg | wc -l)"
 
-      - name: Render SVG preview for visual verification
+      - name: Render and verify visually
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import cairosvg
-          cairosvg.svg2png(url='preview/logo-vtracer.svg',write_to='preview/logo-vtracer-preview.png',output_width=1220,output_height=476)
+          from PIL import Image
+          import cairosvg, math
+
+          cairosvg.svg2png(url='preview/logo-vtracer.svg',write_to='preview/logo-vtracer-preview.png',output_width=305,output_height=119)
+          src=Image.open('preview/logo-source-clean.png').convert('RGBA')
+          out=Image.open('preview/logo-vtracer-preview.png').convert('RGBA')
+
+          # Foreground-mask overlap catches the previous failure mode: a dark rectangle / filled background.
+          src_a=list(src.getchannel('A').getdata())
+          out_a=list(out.getchannel('A').getdata())
+          src_fg=[a>24 for a in src_a]
+          out_fg=[a>24 for a in out_a]
+          inter=sum(a and b for a,b in zip(src_fg,out_fg))
+          union=sum(a or b for a,b in zip(src_fg,out_fg))
+          iou=inter/union if union else 0
+          out_ratio=sum(out_fg)/len(out_fg)
+          src_ratio=sum(src_fg)/len(src_fg)
+
+          # Compare shape/color after compositing on white.
+          white=Image.new('RGBA',src.size,(255,255,255,255))
+          s=Image.alpha_composite(white,src).convert('RGB')
+          o=Image.alpha_composite(white,out).convert('RGB')
+          sp=list(s.getdata()); op=list(o.getdata())
+          mae=sum(abs(a-b) for p,q in zip(sp,op) for a,b in zip(p,q))/(len(sp)*3)
+
+          # Corners must stay transparent; opaque corners would recreate the black-box problem.
+          corners=[out.getpixel((0,0))[3],out.getpixel((304,0))[3],out.getpixel((0,118))[3],out.getpixel((304,118))[3]]
+          corner_alpha=max(corners)
+
+          metrics=f'source_foreground={src_ratio:.4f}\nvector_foreground={out_ratio:.4f}\nmask_iou={iou:.4f}\nmae={mae:.2f}\ncorner_alpha_max={corner_alpha}\n'
+          open('preview/logo-quality.txt','w').write(metrics)
+          print(metrics)
+
+          assert 0.15 < out_ratio < 0.75, f'foreground ratio suspicious: {out_ratio}'
+          assert iou > 0.68, f'foreground IoU too low: {iou}'
+          assert mae < 55, f'pixel MAE too high: {mae}'
+          assert corner_alpha < 16, f'background is not transparent: corner alpha {corner_alpha}'
           PY
 
       - name: Commit preview only, do not change live site
@@ -85,9 +118,9 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add preview/logo-source-clean.png preview/logo-vtracer.svg preview/logo-vtracer-preview.png
+          git add preview/logo-source-clean.png preview/logo-vtracer.svg preview/logo-vtracer-preview.png preview/logo-quality.txt
           if ! git diff --cached --quiet; then
-            git commit -m 'Build VTracer logo preview for inspection'
+            git commit -m 'Build and verify VTracer logo preview'
             git pull --rebase origin main
             git push origin HEAD:main
           fi
